@@ -9,9 +9,24 @@ This module provides data structures for logging session work:
 
 from __future__ import annotations
 
+import csv
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
+from pathlib import Path
+
+SESSION_LOG_HEADERS = [
+    "session_id",
+    "agent_id",
+    "timestamp",
+    "req_id",
+    "status",
+    "context",
+    "next_steps",
+    "blockers",
+    "tags",
+    "files_touched",
+]
 
 
 class SessionStatus(str, Enum):
@@ -90,3 +105,85 @@ class SessionEntry:
             tags=[t for t in row.get("tags", "").split("|") if t],
             files_touched=[f for f in row.get("files_touched", "").split("|") if f],
         )
+
+
+class SessionLog:
+    """Collection of session log entries.
+
+    Manages session log CSV with add/query operations.
+    """
+
+    def __init__(self, path: Path) -> None:
+        """Initialize SessionLog with path.
+
+        Args:
+            path: Path to session_log.csv file
+        """
+        self.path = path
+        self.entries: list[SessionEntry] = []
+
+    def __len__(self) -> int:
+        """Return number of entries."""
+        return len(self.entries)
+
+    @classmethod
+    def load(cls, path: Path) -> SessionLog:
+        """Load SessionLog from CSV file.
+
+        Args:
+            path: Path to session_log.csv
+
+        Returns:
+            SessionLog with loaded entries (empty if file doesn't exist)
+        """
+        log = cls(path)
+        if path.exists():
+            with open(path, newline="", encoding="utf-8") as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    log.entries.append(SessionEntry.from_dict(row))
+        return log
+
+    def add(self, entry: SessionEntry) -> None:
+        """Add a session entry."""
+        self.entries.append(entry)
+
+    def save(self) -> None:
+        """Save entries to CSV file."""
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        with open(self.path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=SESSION_LOG_HEADERS)
+            writer.writeheader()
+            for entry in self.entries:
+                writer.writerow(entry.to_dict())
+
+    def for_requirement(self, req_id: str) -> list[SessionEntry]:
+        """Get all entries for a requirement, sorted by timestamp descending."""
+        matches = [e for e in self.entries if req_id in e.req_id.split("|")]
+        return sorted(matches, key=lambda e: e.timestamp, reverse=True)
+
+    def latest_for_requirement(self, req_id: str) -> SessionEntry | None:
+        """Get most recent entry for a requirement."""
+        entries = self.for_requirement(req_id)
+        return entries[0] if entries else None
+
+    def search(self, text: str | None = None, tag: str | None = None) -> list[SessionEntry]:
+        """Search entries by text or tag.
+
+        Args:
+            text: Text to search in context, next_steps, blockers
+            tag: Tag to filter by
+
+        Returns:
+            Matching entries sorted by timestamp descending
+        """
+        results = []
+        for entry in self.entries:
+            if tag and tag not in entry.tags:
+                continue
+            if text:
+                searchable = f"{entry.context} {entry.next_steps} {entry.blockers}".lower()
+                if text.lower() not in searchable:
+                    continue
+            results.append(entry)
+        return sorted(results, key=lambda e: e.timestamp, reverse=True)
