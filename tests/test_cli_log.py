@@ -194,3 +194,96 @@ class TestLogView:
         )
         assert result.exit_code == 0, result.output
         assert "No session history" in result.output
+
+
+class TestLogSearch:
+    """Tests for rtmx log search command."""
+
+    @pytest.fixture
+    def rtmx_project(self, tmp_path: Path) -> Path:
+        """Create minimal RTMX project structure."""
+        rtmx_dir = tmp_path / ".rtmx"
+        rtmx_dir.mkdir()
+        config = rtmx_dir / "config.yaml"
+        config.write_text("rtmx:\n  database: .rtmx/database.csv\n")
+        db = rtmx_dir / "database.csv"
+        db.write_text(
+            "req_id,category,requirement_text,status\nREQ-TEST-001,TEST,Test req,MISSING\n"
+        )
+        return tmp_path
+
+    @pytest.fixture
+    def project_with_logs(self, rtmx_project: Path) -> Path:
+        """Create project with existing session logs."""
+        log = SessionLog(rtmx_project / ".rtmx" / "session_log.csv")
+        log.add(
+            SessionEntry(
+                session_id="sess_001",
+                agent_id="claude:abc123",
+                timestamp=datetime(2025, 1, 26, 14, 30, 0),
+                req_id="REQ-TEST-001",
+                status=SessionStatus.INTERRUPTED,
+                context="Completed initial work",
+                next_steps="Continue with step 2",
+                blockers="Found bug in auth",
+                tags=["auth"],
+                files_touched=["src/auth.py"],
+            )
+        )
+        log.add(
+            SessionEntry(
+                session_id="sess_002",
+                agent_id="ralph:xyz789",
+                timestamp=datetime(2025, 1, 25, 10, 0, 0),
+                req_id="REQ-TEST-001",
+                status=SessionStatus.COMPLETED,
+                context="Set up project",
+                next_steps="Add main feature",
+                tags=[],
+                files_touched=[],
+            )
+        )
+        log.save()
+        return rtmx_project
+
+    @pytest.mark.req("REQ-DX-001")
+    @pytest.mark.scope_integration
+    @pytest.mark.technique_nominal
+    @pytest.mark.env_simulation
+    def test_log_search_text(
+        self, project_with_logs: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """rtmx log search finds entries by text."""
+        monkeypatch.chdir(project_with_logs)
+        runner = CliRunner()
+        result = runner.invoke(
+            main,
+            ["log", "search", "bug in auth"],
+            catch_exceptions=False,
+        )
+        assert result.exit_code == 0, result.output
+        assert "REQ-TEST-001" in result.output
+        # The blocker contains "bug in auth"
+        assert "sess_001" in result.output or "claude:abc123" in result.output
+
+    @pytest.mark.req("REQ-DX-001")
+    @pytest.mark.scope_integration
+    @pytest.mark.technique_nominal
+    @pytest.mark.env_simulation
+    def test_log_search_tag(
+        self, project_with_logs: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """rtmx log search --tag finds entries by tag."""
+        monkeypatch.chdir(project_with_logs)
+        runner = CliRunner()
+        result = runner.invoke(
+            main,
+            ["log", "search", "--tag", "auth"],
+            catch_exceptions=False,
+        )
+        assert result.exit_code == 0, result.output
+        assert "REQ-TEST-001" in result.output
+        # sess_001 has auth tag, sess_002 doesn't
+        assert "claude:abc123" in result.output
+        # ralph's entry has no auth tag
+        assert "ralph:xyz789" not in result.output

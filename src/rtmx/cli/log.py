@@ -125,3 +125,37 @@ def run_log_view(req_id: str) -> None:
         if entry.files_touched:
             click.echo(f"  Files: {', '.join(entry.files_touched)}")
         click.echo()
+
+
+def run_log_search(query: str | None, tag: str | None) -> None:
+    """Search session logs.
+
+    Args:
+        query: Text to search in context, next_steps, blockers
+        tag: Tag to filter by
+    """
+    if not query and not tag:
+        click.echo("Provide a search query or --tag")
+        raise SystemExit(1)
+
+    log_path = get_session_log_path()
+    session_log = SessionLog.load(log_path)
+
+    results = session_log.search(text=query, tag=tag)
+
+    if not results:
+        click.echo("No matching entries found")
+        return
+
+    click.echo(f"Found {len(results)} matching entries:")
+    click.echo()
+
+    for entry in results:
+        click.echo(
+            f"{entry.req_id} | {entry.timestamp.strftime('%Y-%m-%d')} | {entry.agent_id}"
+        )
+        if entry.context:
+            click.echo(f"  Context: {entry.context}")
+        if entry.blockers and query and query.lower() in entry.blockers.lower():
+            click.echo(f"  {Colors.RED}Blocker: {entry.blockers}{Colors.RESET}")
+        click.echo()

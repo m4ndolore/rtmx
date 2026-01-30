@@ -1087,5 +1087,21 @@ def log_view(req_id: str) -> None:
     run_log_view(req_id)
 
 
+@log_cmd.command("search")
+@click.argument("query", required=False)
+@click.option("--tag", help="Filter by tag")
+def log_search(query: str | None, tag: str | None) -> None:
+    """Search session logs.
+
+    \b
+    Examples:
+        rtmx log search "race condition"
+        rtmx log search --tag auth
+    """
+    from rtmx.cli.log import run_log_search
+
+    run_log_search(query, tag)
+
+
 if __name__ == "__main__":
     main()
