@@ -974,5 +974,92 @@ def docs_config(output: Path | None) -> None:
     run_docs_config(output)
 
 
+# =============================================================================
+# Session Log Commands
+# =============================================================================
+
+
+@main.group("log")
+def log_cmd() -> None:
+    """Manage session work logs.
+
+    Track work sessions for seamless pickup across sessions.
+    """
+    pass
+
+
+@log_cmd.command("add")
+@click.argument("req_id")
+@click.option(
+    "--status",
+    type=click.Choice(["completed", "interrupted", "blocked", "handed_off"]),
+    required=True,
+    help="Session outcome status",
+)
+@click.option(
+    "--context",
+    required=True,
+    help="What was accomplished (brief)",
+)
+@click.option(
+    "--next",
+    "next_steps",
+    required=True,
+    help="Exactly where to pick up (specific, actionable)",
+)
+@click.option(
+    "--blocker",
+    "blockers",
+    default="",
+    help="What's preventing progress (if any)",
+)
+@click.option(
+    "--tag",
+    "tags",
+    multiple=True,
+    help="Tags for cross-cutting concerns (can repeat)",
+)
+@click.option(
+    "--files",
+    "files_touched",
+    multiple=True,
+    help="Files modified during session (can repeat)",
+)
+@click.option(
+    "--agent",
+    "agent_id",
+    default=None,
+    help="Agent ID (default: auto-detect or 'unknown')",
+)
+def log_add(
+    req_id: str,
+    status: str,
+    context: str,
+    next_steps: str,
+    blockers: str,
+    tags: tuple[str, ...],
+    files_touched: tuple[str, ...],
+    agent_id: str | None,
+) -> None:
+    """Add a session log entry.
+
+    Records work session state for seamless pickup by next session.
+
+    \b
+    Examples:
+        rtmx log add REQ-AUTH-001 --status interrupted \\
+            --context "Completed token acquisition" \\
+            --next "Implement mutex in oauth.py:45"
+
+        rtmx log add REQ-CLI-001 --status completed \\
+            --context "Finished implementation" \\
+            --next "Ready for review" \\
+            --tag cli --files src/cli/cmd.py
+    """
+    from rtmx.cli.log import run_log_add
+
+    run_log_add(req_id, status, context, next_steps, blockers, tags, files_touched, agent_id)
+
+
 if __name__ == "__main__":
     main()
