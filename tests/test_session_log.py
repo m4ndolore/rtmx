@@ -260,3 +260,19 @@ class TestSessionLog:
         """SessionLog.search finds entries by tag."""
         results = sample_log.search(tag="auth")
         assert len(results) == 2
+
+
+class TestPublicExports:
+    """Tests for public API exports."""
+
+    @pytest.mark.req("REQ-DX-001")
+    @pytest.mark.scope_unit
+    @pytest.mark.technique_nominal
+    @pytest.mark.env_simulation
+    def test_session_log_exports_from_rtmx(self) -> None:
+        """Session log classes are exported from rtmx package."""
+        from rtmx import SessionEntry, SessionLog, SessionStatus
+
+        assert SessionStatus.COMPLETED.value == "completed"
+        assert hasattr(SessionEntry, "from_dict")
+        assert hasattr(SessionLog, "load")
