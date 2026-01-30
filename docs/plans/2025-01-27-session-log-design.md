@@ -216,23 +216,25 @@ This enables seamless pickup by the next session.
 
 ## Implementation Phases
 
-### Phase 1: Core Session Log
-- [ ] Add `session_log.csv` schema to RTMX
-- [ ] Implement `rtmx log add` CLI command
-- [ ] Implement `rtmx log <REQ-ID>` CLI command
-- [ ] Implement `rtmx log search` CLI command
+### Phase 1: Core Session Log ✅ COMPLETE
+- [x] Add `session_log.csv` schema to RTMX (SessionStatus, SessionEntry, SessionLog)
+- [x] Implement `rtmx log add` CLI command
+- [x] Implement `rtmx log view <REQ-ID>` CLI command
+- [x] Implement `rtmx log search` CLI command
+- [x] Export session log classes from `rtmx` package
+- [x] Add E2E workflow tests
 
-### Phase 2: Enhanced Backlog
-- [ ] Modify `rtmx backlog` to read session log
-- [ ] Display pickup context for interrupted/handed-off items
-- [ ] Add `--no-context` flag for minimal output
+### Phase 2: Enhanced Backlog ✅ COMPLETE
+- [x] Modify `rtmx backlog` to read session log
+- [x] Display pickup context for interrupted/handed-off items
+- [ ] Add `--no-context` flag for minimal output (future)
 
-### Phase 3: MCP Integration
+### Phase 3: MCP Integration (future)
 - [ ] Add `rtmx_log_session` MCP tool
 - [ ] Add `rtmx_log_search` MCP tool
 - [ ] Update Ralph integration docs
 
-### Phase 4: Hooks & Prompting
+### Phase 4: Hooks & Prompting (future)
 - [ ] Implement context-warning hook (90% threshold)
 - [ ] Add CLAUDE.md template with session continuity instructions
 - [ ] Document hook configuration
