@@ -13,6 +13,7 @@ from pathlib import Path
 
 import click
 
+from rtmx.formatting import Colors, header
 from rtmx.session_log import SessionEntry, SessionLog, SessionStatus
 
 
@@ -83,3 +84,44 @@ def run_log_add(
     click.echo(f"  Requirement: {req_id}")
     click.echo(f"  Status: {status}")
     click.echo(f"  Next: {next_steps}")
+
+
+def run_log_view(req_id: str) -> None:
+    """Show session history for a requirement.
+
+    Args:
+        req_id: Requirement ID to show history for
+    """
+    log_path = get_session_log_path()
+    session_log = SessionLog.load(log_path)
+
+    entries = session_log.for_requirement(req_id)
+
+    if not entries:
+        click.echo(f"No session history for {req_id}")
+        return
+
+    click.echo(header(f"Session History for {req_id}", "="))
+    click.echo()
+
+    for entry in entries:
+        status_color = {
+            SessionStatus.COMPLETED: Colors.GREEN,
+            SessionStatus.INTERRUPTED: Colors.YELLOW,
+            SessionStatus.BLOCKED: Colors.RED,
+            SessionStatus.HANDED_OFF: Colors.CYAN,
+        }.get(entry.status, Colors.RESET)
+
+        click.echo(
+            f"{entry.timestamp.strftime('%Y-%m-%d %H:%M')} | "
+            f"{entry.agent_id} | "
+            f"{status_color}{entry.status.value}{Colors.RESET}"
+        )
+        click.echo(f"  Context: {entry.context}")
+        if entry.next_steps:
+            click.echo(f"  Next: {entry.next_steps}")
+        if entry.blockers:
+            click.echo(f"  {Colors.RED}Blocker: {entry.blockers}{Colors.RESET}")
+        if entry.files_touched:
+            click.echo(f"  Files: {', '.join(entry.files_touched)}")
+        click.echo()

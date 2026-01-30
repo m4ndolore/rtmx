@@ -979,13 +979,21 @@ def docs_config(output: Path | None) -> None:
 # =============================================================================
 
 
-@main.group("log")
-def log_cmd() -> None:
+@main.group("log", invoke_without_command=True)
+@click.pass_context
+def log_cmd(ctx: click.Context) -> None:
     """Manage session work logs.
 
     Track work sessions for seamless pickup across sessions.
+
+    \b
+    Examples:
+        rtmx log view REQ-AUTH-001      # View history for requirement
+        rtmx log add REQ-AUTH-001 ...   # Add entry
+        rtmx log search "race condition" # Search logs
     """
-    pass
+    if ctx.invoked_subcommand is None:
+        click.echo(ctx.get_help())
 
 
 @log_cmd.command("add")
@@ -1059,6 +1067,24 @@ def log_add(
     from rtmx.cli.log import run_log_add
 
     run_log_add(req_id, status, context, next_steps, blockers, tags, files_touched, agent_id)
+
+
+@log_cmd.command("view")
+@click.argument("req_id")
+def log_view(req_id: str) -> None:
+    """View session history for a requirement.
+
+    Shows all recorded session entries for the given requirement,
+    sorted by most recent first.
+
+    \b
+    Examples:
+        rtmx log view REQ-AUTH-001      # View history
+        rtmx log view REQ-CLI-001       # View CLI requirement history
+    """
+    from rtmx.cli.log import run_log_view
+
+    run_log_view(req_id)
 
 
 if __name__ == "__main__":
