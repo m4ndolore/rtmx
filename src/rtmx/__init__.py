@@ -20,6 +20,7 @@ from rtmx.models import (
     RTMValidationError,
     Status,
 )
+from rtmx.session_log import SessionEntry, SessionLog, SessionStatus
 
 __version__ = "0.0.5"
 __all__ = [
@@ -32,5 +33,8 @@ __all__ = [
     "RTMValidationError",
     "RTMXConfig",
     "load_config",
+    "SessionEntry",
+    "SessionLog",
+    "SessionStatus",
     "__version__",
 ]

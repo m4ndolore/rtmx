@@ -974,5 +974,134 @@ def docs_config(output: Path | None) -> None:
     run_docs_config(output)
 
 
+# =============================================================================
+# Session Log Commands
+# =============================================================================
+
+
+@main.group("log", invoke_without_command=True)
+@click.pass_context
+def log_cmd(ctx: click.Context) -> None:
+    """Manage session work logs.
+
+    Track work sessions for seamless pickup across sessions.
+
+    \b
+    Examples:
+        rtmx log view REQ-AUTH-001      # View history for requirement
+        rtmx log add REQ-AUTH-001 ...   # Add entry
+        rtmx log search "race condition" # Search logs
+    """
+    if ctx.invoked_subcommand is None:
+        click.echo(ctx.get_help())
+
+
+@log_cmd.command("add")
+@click.argument("req_id")
+@click.option(
+    "--status",
+    type=click.Choice(["completed", "interrupted", "blocked", "handed_off"]),
+    required=True,
+    help="Session outcome status",
+)
+@click.option(
+    "--context",
+    required=True,
+    help="What was accomplished (brief)",
+)
+@click.option(
+    "--next",
+    "next_steps",
+    required=True,
+    help="Exactly where to pick up (specific, actionable)",
+)
+@click.option(
+    "--blocker",
+    "blockers",
+    default="",
+    help="What's preventing progress (if any)",
+)
+@click.option(
+    "--tag",
+    "tags",
+    multiple=True,
+    help="Tags for cross-cutting concerns (can repeat)",
+)
+@click.option(
+    "--files",
+    "files_touched",
+    multiple=True,
+    help="Files modified during session (can repeat)",
+)
+@click.option(
+    "--agent",
+    "agent_id",
+    default=None,
+    help="Agent ID (default: auto-detect or 'unknown')",
+)
+def log_add(
+    req_id: str,
+    status: str,
+    context: str,
+    next_steps: str,
+    blockers: str,
+    tags: tuple[str, ...],
+    files_touched: tuple[str, ...],
+    agent_id: str | None,
+) -> None:
+    """Add a session log entry.
+
+    Records work session state for seamless pickup by next session.
+
+    \b
+    Examples:
+        rtmx log add REQ-AUTH-001 --status interrupted \\
+            --context "Completed token acquisition" \\
+            --next "Implement mutex in oauth.py:45"
+
+        rtmx log add REQ-CLI-001 --status completed \\
+            --context "Finished implementation" \\
+            --next "Ready for review" \\
+            --tag cli --files src/cli/cmd.py
+    """
+    from rtmx.cli.log import run_log_add
+
+    run_log_add(req_id, status, context, next_steps, blockers, tags, files_touched, agent_id)
+
+
+@log_cmd.command("view")
+@click.argument("req_id")
+def log_view(req_id: str) -> None:
+    """View session history for a requirement.
+
+    Shows all recorded session entries for the given requirement,
+    sorted by most recent first.
+
+    \b
+    Examples:
+        rtmx log view REQ-AUTH-001      # View history
+        rtmx log view REQ-CLI-001       # View CLI requirement history
+    """
+    from rtmx.cli.log import run_log_view
+
+    run_log_view(req_id)
+
+
+@log_cmd.command("search")
+@click.argument("query", required=False)
+@click.option("--tag", help="Filter by tag")
+def log_search(query: str | None, tag: str | None) -> None:
+    """Search session logs.
+
+    \b
+    Examples:
+        rtmx log search "race condition"
+        rtmx log search --tag auth
+    """
+    from rtmx.cli.log import run_log_search
+
+    run_log_search(query, tag)
+
+
 if __name__ == "__main__":
     main()

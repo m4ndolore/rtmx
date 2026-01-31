@@ -12,6 +12,8 @@ from pathlib import Path
 
 from rtmx.formatting import Colors, format_table, header
 from rtmx.models import Priority, RTMDatabase, RTMError, Status
+from rtmx.session_log import SessionLog
+from rtmx.session_log import SessionStatus as SessStatus
 
 
 class BacklogView(str, Enum):
@@ -22,6 +24,29 @@ class BacklogView(str, Enum):
     QUICK_WINS = "quick-wins"
     BLOCKERS = "blockers"
     LIST = "list"
+
+
+def _get_pickup_context(req_id: str) -> tuple[str, str, str] | None:
+    """Get pickup context for a requirement if interrupted/handed_off.
+
+    Returns:
+        Tuple of (agent_id, next_steps, timestamp_str) or None
+    """
+    try:
+        log_path = Path.cwd() / ".rtmx" / "session_log.csv"
+        if not log_path.exists():
+            return None
+        session_log = SessionLog.load(log_path)
+        entry = session_log.latest_for_requirement(req_id)
+        if entry and entry.status in (SessStatus.INTERRUPTED, SessStatus.HANDED_OFF, SessStatus.BLOCKED):
+            return (
+                entry.agent_id,
+                entry.next_steps,
+                entry.timestamp.strftime("%Y-%m-%d %H:%M"),
+            )
+    except Exception:
+        pass  # Don't break backlog if session log fails
+    return None
 
 
 def run_backlog(
@@ -251,6 +276,15 @@ def _show_critical_path_section(
 
     headers = ["#", "Status", "Requirement", "Description", "Effort", "Blocks", "Phase"]
     print(format_table(table_data, headers))
+
+    # Show pickup context for items with interrupted sessions
+    print()
+    for req, _ in blockers:
+        pickup = _get_pickup_context(req.req_id)
+        if pickup:
+            agent_id, next_steps, timestamp = pickup
+            print(f"  {Colors.YELLOW}PICKUP{Colors.RESET} {req.req_id} from {agent_id} ({timestamp})")
+            print(f"     Next: {next_steps}")
 
 
 def _show_quick_wins_section(

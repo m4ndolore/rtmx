@@ -1038,3 +1038,125 @@ class TestCLIIntegration:
         sys.stdout = old_stdout
 
         assert "RTM Status Check" in output
+
+
+# =============================================================================
+# Tests for backlog with session log integration
+# =============================================================================
+
+
+class TestBacklogWithSessionLog:
+    """Tests for backlog command with session log integration."""
+
+    @pytest.fixture
+    def project_with_session_log(self, tmp_path: Path) -> Path:
+        """Create project with RTM and session log."""
+        from datetime import datetime
+
+        from rtmx.session_log import SessionEntry, SessionLog, SessionStatus
+
+        # Create .rtmx directory
+        rtmx_dir = tmp_path / ".rtmx"
+        rtmx_dir.mkdir()
+
+        # Create RTM database
+        headers = [
+            "req_id",
+            "category",
+            "requirement_text",
+            "status",
+            "priority",
+            "phase",
+            "effort_weeks",
+            "dependencies",
+            "blocks",
+        ]
+        rows = [
+            {
+                "req_id": "REQ-AUTH-001",
+                "category": "AUTH",
+                "requirement_text": "OAuth flow",
+                "status": "PARTIAL",
+                "priority": "HIGH",
+                "phase": "3",
+                "effort_weeks": "1.5",
+                "dependencies": "",
+                "blocks": "REQ-AUTH-002",
+            },
+            {
+                "req_id": "REQ-AUTH-002",
+                "category": "AUTH",
+                "requirement_text": "Token refresh",
+                "status": "MISSING",
+                "priority": "MEDIUM",
+                "phase": "3",
+                "effort_weeks": "1.0",
+                "dependencies": "REQ-AUTH-001",
+                "blocks": "",
+            },
+            {
+                "req_id": "REQ-CLI-001",
+                "category": "CLI",
+                "requirement_text": "Export command",
+                "status": "MISSING",
+                "priority": "HIGH",
+                "phase": "3",
+                "effort_weeks": "0.5",
+                "dependencies": "",
+                "blocks": "",
+            },
+        ]
+        csv_path = rtmx_dir / "database.csv"
+        with open(csv_path, "w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=headers)
+            writer.writeheader()
+            writer.writerows(rows)
+
+        # Create session log with interrupted work
+        log = SessionLog(rtmx_dir / "session_log.csv")
+        log.add(
+            SessionEntry(
+                session_id="sess_001",
+                agent_id="claude:abc123",
+                timestamp=datetime(2025, 1, 26, 14, 30, 0),
+                req_id="REQ-AUTH-001",
+                status=SessionStatus.INTERRUPTED,
+                context="Completed token acquisition",
+                next_steps="Implement mutex in oauth.py:45",
+                blockers="Race condition",
+                tags=["auth"],
+                files_touched=["src/auth/oauth.py"],
+            )
+        )
+        log.save()
+
+        return tmp_path
+
+    @pytest.mark.req("REQ-UX-001")
+    @pytest.mark.scope_integration
+    @pytest.mark.technique_nominal
+    @pytest.mark.env_simulation
+    def test_backlog_shows_pickup_context(
+        self, project_with_session_log: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Backlog shows pickup context for interrupted work."""
+        monkeypatch.chdir(project_with_session_log)
+
+        from io import StringIO
+
+        from rtmx.cli.backlog import BacklogView, run_backlog
+
+        captured = StringIO()
+        monkeypatch.setattr(sys, "stdout", captured)
+
+        run_backlog(
+            rtm_csv=project_with_session_log / ".rtmx" / "database.csv",
+            phase=None,
+            view=BacklogView.ALL,
+            limit=10,
+        )
+
+        output = captured.getvalue()
+        # Should show pickup context for REQ-AUTH-001
+        assert "PICKUP" in output or "claude:abc123" in output
+        assert "mutex" in output.lower() or "oauth" in output.lower()
