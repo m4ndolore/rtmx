@@ -49,8 +49,7 @@ rtmx:
       repo: "iotactical/rtmx"
       token_env: "GITHUB_TOKEN"
       labels:
-        - "requirement"
-        - "feature"
+        requirement: "requirement"
     jira:
       enabled: false
 
